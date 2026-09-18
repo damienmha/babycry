@@ -1,0 +1,86 @@
+---
+title: "Stats 141XP Final SVM"
+author: "Damien Ha"
+date: "2024-06-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(e1071)
+library(caret)
+```
+
+
+```{r}
+# Read data
+full_data <- read.csv("./final_data_full.csv")
+filtered_data <- read.csv("./filtered_cry_data_final.csv")
+
+# Perform PCA
+pcaCries <- prcomp(filtered_data[, 8:6375], center = TRUE, scale. = TRUE)
+num_components <- 5
+pca_components <- pcaCries$x[, 1:num_components]
+response_variable <- filtered_data$sample
+
+pca_data <- as.data.frame(pca_components)
+pca_data$response_variable <- response_variable
+```
+
+
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(pca_data$response_variable, p = 0.8, list = FALSE)
+train_data <- pca_data[trainIndex, ]
+test_data <- pca_data[-trainIndex, ]
+```
+
+```{r}
+# Set up cross-validation
+train_control <- trainControl(method = "cv", number = 5)
+
+# Train SVM model with radial basis function kernel
+svm_model <- train(response_variable ~ ., data = train_data, method = "svmRadial",
+                   trControl = train_control,
+                   tuneLength = 5)
+
+# Print best model
+print(svm_model$bestTune)
+```
+
+```{r}
+# Make predictions on the test data
+svm_predictions <- predict(svm_model, newdata = test_data)
+
+# Evaluate performance
+confusion_matrix <- confusionMatrix(svm_predictions, test_data$response_variable)
+print(confusion_matrix)
+```
+
+```{r}
+hungry_pca_data <- pca_data
+hungry_pca_data$response_variable <- ifelse(hungry_pca_data$response_variable == "hungry", "hungry", "not hungry")
+
+# Split the data into training and testing sets
+hungry_trainIndex <- createDataPartition(hungry_pca_data$response_variable, p = 0.8, list = FALSE)
+hungry_train_data <- hungry_pca_data[hungry_trainIndex, ]
+hungry_test_data <- hungry_pca_data[-hungry_trainIndex, ]
+
+# Train SVM model for binary classification
+hungry_svm_model <- train(response_variable ~ ., data = hungry_train_data, method = "svmRadial",
+                          trControl = train_control,
+                          tuneLength = 5)
+
+# Print best model
+print(hungry_svm_model$bestTune)
+
+# Make predictions on the test data
+hungry_svm_predictions <- predict(hungry_svm_model, newdata = hungry_test_data)
+
+# Evaluate performance
+hungry_confusion_matrix <- confusionMatrix(hungry_svm_predictions, hungry_test_data$response_variable)
+print(hungry_confusion_matrix)
+```
