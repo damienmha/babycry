@@ -1,0 +1,333 @@
+---
+title: "eda2"
+author: "Ananya Garg"
+date: "2024-05-22"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+tired_features <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/tired_features_osm_affect.csv", sep=";")
+
+tired_features[,"label"] <- "tired"
+
+hungry_features <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/hungry_features_osm_affect.csv",sep=";")
+
+hungry_features[,"label"] <- "hungry"
+
+discomfort_features <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/discomfort_features_osm_affect.csv",sep=";")
+
+discomfort_features[,"label"] <- "discomfort"
+
+burping_features <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/burping_features_osm_affect.csv",sep=";")
+
+burping_features[,"label"] <- "burping"
+
+bellypain_features <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/belly_pain_features_osm_affect.csv",sep=";")
+
+bellypain_features[,"label"] <- "bellypain"
+
+
+all_features <- rbind(tired_features, hungry_features, discomfort_features, burping_features, bellypain_features)
+
+head(all_features)
+dim(all_features)
+```
+
+## EDA
+
+```{r}
+library(ggplot2)
+ggplot(all_features, aes(x = label, fill = label)) +
+  geom_bar() +
+  ggtitle("Distribution of Types of Cry before Filtering") +
+  labs(x = "Type of Noise", y = "Count")
+```
+
+```{r}
+crydetection <- read.csv("/Users/ananyagarg/Library/CloudStorage/GoogleDrive-ananyagarg81@g.ucla.edu/My Drive/Senior/Spring 2024/STATS 141XP/Final Project/20231115_kaggle_cry_detection.csv")
+
+head(crydetection)
+dim(crydetection)
+```
+
+## EDA
+
+```{r}
+library(stringr)
+typeofpain <- gsub("^.*?_","",crydetection$sample)
+typeofpain <- gsub("\\..*", "", typeofpain)
+typeofpain <- gsub("\\_.*","",typeofpain)
+crydetection$sample <- typeofpain
+
+ggplot(crydetection, aes(fill = prediction, x = sample)) +
+  geom_bar(position = "dodge") +
+  ggtitle("Distribution of Junk Noises vs Cry Noises") +
+  labs(x = "Type of Noise", y = "Count")
+
+
+library(dplyr)
+count_per_noise <- crydetection %>% count(sample)
+count_per_noise
+
+junk_count <- crydetection %>% count(prediction)
+```
+
+```{r}
+bellypain_features <- bellypain_features[-17,]
+
+bellypain_fulldata <- cbind(crydetection[crydetection$sample == "belly",], bellypain_features)
+
+burping_fulldata <- cbind(crydetection[crydetection$sample == "burping",], burping_features)
+
+discomfort_fulldata <- cbind(crydetection[crydetection$sample == "discomfort",], discomfort_features)
+
+
+hungry_fulldata <- cbind(crydetection[crydetection$sample == "hungry",], hungry_features)
+
+tired_fulldata <- cbind(crydetection[crydetection$sample == "tired",], tired_features)
+
+fulldata <- rbind(bellypain_fulldata, burping_fulldata, discomfort_fulldata, hungry_fulldata, tired_fulldata)
+
+head(fulldata)
+fulldata_cries <- fulldata[fulldata$prediction == "crynoises",]
+fulldata_junk <- fulldata[fulldata$prediction == "junknoises",]
+
+filtered_data <- fulldata_cries
+
+
+final_data_full <- rbind(fulldata_cries, fulldata_junk)
+final_data_full %>% group_by(sample) %>% count(prediction)
+
+
+write.csv(final_data_full, file = "final_data_full.csv")
+write.csv(filtered_data, file = "filtered_cry_data_final.csv")
+```
+
+```{r}
+library(ggplot2)
+ggplot(filtered_data, aes(fill = sample, x = sample)) +
+  geom_bar(position = "dodge") +
+  ggtitle("Distribution of Types of Noise") +
+  labs(x = "Type of Noise", y = "Count")
+
+library(dplyr)
+filtered_count_per_noise <- filtered_data %>% count(sample)
+filtered_count_per_noise
+
+nrow(filtered_data)
+```
+
+## Models with all cry categories:
+
+#KNN
+```{r}
+X <- filtered_data %>% select(where(is.numeric))
+index <- sample(1:nrow(X), 0.7*nrow(X))
+
+train_x <- X[index, ]
+test_x <- X[-index, ]
+
+train_y <- filtered_data$sample[index]
+test_y <- filtered_data$sample[-index]
+
+library(class)
+test_pred <- knn(
+                 train = train_x, 
+                 test = test_x,
+                 cl = train_y, 
+                 k=10
+                 )
+
+mean(as.factor(test_y) == test_pred)
+
+```
+
+
+# Random Forest 
+```{r}
+library(randomForest)
+library(varImp)
+
+num_data <- filtered_data
+Y <- as.factor(num_data$sample)
+X <- num_data %>% select(-sample)
+
+rf <- randomForest(Y~., data = X, mtry = 500, importance = TRUE)
+
+important_features <- importance(rf)
+sorted_importance <- important_features[order(important_features[, 1], decreasing = TRUE), ]
+top_20_features <- rownames(sorted_importance)[1:20]
+
+new_data <- num_data[, top_20_features]
+table(num_data$sample)
+new_data
+new_data %>% count(label)
+```
+
+# PCA
+```{r}
+pcaCries<- prcomp(filtered_data[,8:6375])
+summary(pcaCries)
+# Scree plot
+plot(pcaCries$sdev[1:15]^2, type = "b", xlab = "Principal Component", ylab = "Variance Explained", main = "Scree Plot")
+
+
+# Select components
+num_components <- 3
+
+# Extract selected principal components
+pca_components <- pcaCries$x[, 1:num_components]
+typeof(pca_components)
+
+prop_varex <- ((pcaCries$sdev)^2)/sum(((pcaCries$sdev)^2))
+plot(cumsum(prop_varex), xlab = "Principal Component", ylab = "Cumulative Proportion of Variance Explained", type = 'b')
+
+# Prepare response variable (dependent variable)
+
+response_variable <- filtered_data[, 1]
+
+```
+
+# Random Forest with PCA
+```{r}
+# Split test and train
+set.seed(100)
+test_in <- sample(1:315, 221, replace = F)
+train_cries <- filtered_data[test_in,8:6375]
+test_cries <- filtered_data[-test_in,8:6375]
+
+response_train <- filtered_data[test_in, 1]
+response_test <- filtered_data[-test_in, 1]
+
+transformed_train <- predict(pcaCries, newdata = train_cries)[, 1:num_components]
+transformed_test <- predict(pcaCries, newdata = test_cries)[, 1:num_components]
+  
+  
+transformed_train_df <- as.data.frame(transformed_train)
+transformed_test_df <- as.data.frame(transformed_test)
+
+# Random Forest Model
+library(randomForest)
+set.seed(99)
+random_forest_pca <- randomForest(factor(response_train) ~ ., data = transformed_train_df, mtry = 3, ntree = 500, importance = TRUE)
+
+prediction <- predict(random_forest_pca, transformed_train_df)
+
+varImpPlot(random_forest_pca, type = 2)
+varImpPlot(random_forest_pca, type = 1)
+varImpPlot(random_forest_pca, scale = F)
+
+mean(prediction == as.factor(response_train))
+
+# Predictions from test data
+
+predict_test <- predict(random_forest_pca, transformed_test_df)
+mean(predict_test == as.factor(response_test))
+
+# Confusion Matrix
+results <- data.frame(actual = filtered_data[-test_in,1], prediction = predict_test)
+results$actual <- as.factor(results$actual)
+
+library(caret)
+t = table(results)
+conf_mat_rf_pca1 <- confusionMatrix(t)
+print(conf_mat_rf_pca$table)
+
+library(yardstick)
+conf_mat_rf_pca <- conf_mat(results, 'actual', estimate = 'prediction')
+autoplot(conf_mat_rf_pca, type = "heatmap") + 
+  scale_fill_gradient(low = "#D6EAF8",high = "#2E86C1")
+
+
+```
+
+
+# Random Forest on data with hungry vs. other:
+```{r}
+filtered_hungry <- filtered_data[filtered_data$sample == "hungry",]
+filtered_other <- filtered_data[filtered_data$sample != "hungry",]
+
+filtered_other$sample <- "other"
+edited_filt_data <- rbind(filtered_hungry, filtered_other)
+
+# distribution of hungry vs. other
+
+ggplot(edited_filt_data, aes(fill = sample, x = sample)) +
+  geom_bar(position = "dodge") +
+  ggtitle("Distribution of Types of Cry") +
+  labs(x = "Type of Noise", y = "Count")
+
+filtered_edited_count <- edited_filt_data %>% count(sample)
+filtered_edited_count
+
+# PCA:
+
+pcaCries_edited <- prcomp(edited_filt_data[,8:6375])
+summary(pcaCries_edited)
+# Scree plot
+plot(pcaCries_edited$sdev[1:15]^2, type = "b", xlab = "Principal Component", ylab = "Variance Explained", main = "Scree Plot")
+
+
+# Select components
+num_components_edited <- 3
+
+# Extract selected principal components
+pca_components_edited <- pcaCries_edited$x[, 1:num_components_edited]
+typeof(pca_components_edited)
+
+# Prepare response variable (dependent variable)
+response_variable_edited <- edited_filt_data[, 1]
+
+# Split test and train
+set.seed(100)
+test_in_edit <- sample(1:315, 221, replace = F)
+train_cries_edit <- edited_filt_data[test_in_edit,8:6375]
+test_cries_edit <- edited_filt_data[-test_in_edit,8:6375]
+
+response_train_edit <- edited_filt_data[test_in_edit, 1]
+response_test_edit <- edited_filt_data[-test_in_edit, 1]
+
+transformed_train_edit <- predict(pcaCries_edited, newdata = train_cries_edit)[, 1:num_components_edited]
+transformed_test_edit <- predict(pcaCries_edited, newdata = test_cries_edit)[, 1:num_components_edited]
+  
+  
+transformed_train_edit_df <- as.data.frame(transformed_train_edit)
+transformed_test_edit_df <- as.data.frame(transformed_test_edit)
+
+# Random Forest Model
+set.seed(99)
+random_forest_pca_edited <- randomForest(factor(response_train_edit) ~ ., data = transformed_train_edit_df, mtry = 3, ntree = 500, importance = TRUE)
+
+prediction_train <- predict(random_forest_pca_edited, transformed_train_edit_df)
+
+varImpPlot(random_forest_pca_edited, type = 2)
+varImpPlot(random_forest_pca_edited, type = 1)
+varImpPlot(random_forest_pca_edited, scale = F)
+
+mean(prediction_train == as.factor(response_train_edit))
+
+# Predictions from test data
+predict_test_edit <- predict(random_forest_pca_edited, transformed_test_edit_df)
+mean(predict_test_edit == as.factor(response_test_edit))
+
+# Confusion Matrix
+results2 <- data.frame(actual = edited_filt_data[-test_in_edit,1], prediction = predict_test_edit)
+results2$actual <- as.factor(results2$actual)
+
+library(caret)
+t2 = table(results2)
+conf_mat_rf_pca2 <- confusionMatrix(t2)
+print(conf_mat_rf_pca2$table)
+
+library(yardstick)
+conf_mat_rf_pca_hungry <- conf_mat(results2, 'actual', estimate = 'prediction')
+autoplot(conf_mat_rf_pca_hungry, type = "heatmap") + 
+  scale_fill_gradient(low = "#D6EAF8",high = "#2E86C1")
+
+```
+
+Accuracy is slightly higher when we group data into a hungry and other category than when we try to classify into 5 different categories
