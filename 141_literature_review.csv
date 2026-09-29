@@ -1,0 +1,10 @@
+study name and url,number of observations used,number of non-cries included in cry study,number of classes,which classes used,models used,training accuracy,testing accuracy,cross validation accuracy,other observations
+Classifying Infant cry type (https://www.kaggle.com/code/kishoreharshankumar/classifying-infant-cry-type),,,5,"class_labels = ['belly pain','burping','discomfort','hungry','tired']",CNN,71.47%,,72.53%,
+Testing the Universal Baby Language Hypothesis - Automatic Infant Speech Recognition with CNNs (https://ieeexplore.ieee.org/document/8441412),"315 (250 small duration recordings for training, 65 for testing)",0,5,"Neh” = hungry; “Eh” = need to burp; “Oah (Owh)” = tired (sleepy); “Eairh (Eargghh)” = stomach cramp (lower gas); “Heh” = physical discomfort at skin kevel (feeling hot or wet, for example)",CNN,,89%,,
+train acc = 100% val acc ≈ 68% (Tensorflow) https://www.kaggle.com/code/philopateergeorgei/train-acc-100-val-acc-68-tensorflow,,,5,"classes = ['belly_pain','burping','discomfort','hungry','tired']",CNN,67.39%,100%,67.39%,
+Infant Weeping Calls Decoder using Statistical Feature Extraction and Gaussian Mixture Models (https://ieeexplore.ieee.org/abstract/document/8944527/references#references),714,,9,"hunger, attention seek, lack of ease, stomach issue, unidentified",Gaussian Mixture Model,,81.27%,,
+https://www.kaggle.com/code/menonbrur/cry-classification,"Total: 457
+Train set : 328
+Validation set : 83
+Test set : 46",,5,"CLASS_IDS = {""belly_pain"": 0, ""burping"": 1, ""discomfort"": 2, ""hungry"": 3, ""tired"": 4}",,84.75%,83%,,
+INFANT CRY ANALYSIS https://www.kaggle.com/code/jangambharadwaj/infant-cry-analysis,,,5,"labels ={'belly_pain':0,'burping': 1,'discomfort': 2,'hungry': 3,'tired': 4}",CNN,,,,
